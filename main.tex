@@ -1,0 +1,44 @@
+\documentclass[10pt, a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amssymb}
+\usepackage{pgf}
+\usepackage{tikz}
+\usetikzlibrary{arrows,automata}
+\usetikzlibrary{graphs}
+\usetikzlibrary{graphs.standard}
+\usepackage{bsymb,b2latex}
+\usepackage{algorithmic}
+
+\newcommand{\BtoDA}[2]{
+    \begin{minipage}[c]{.45\linewidth}
+    #1
+    \end{minipage}\hfill
+    \begin{minipage}[c]{.45\linewidth}
+    %\begin{verbatim}
+    \texttt{#2}
+    %\end{verbatim}
+    \end{minipage}
+}
+
+\title{IEEE1394 modelisation}
+\author{Alexis Grall }
+
+\begin{document}
+
+\maketitle
+%\input{intro.tex}
+%\input{bmethod.tex}
+%\input{casestudy.tex}
+\input{translation.tex}
+%\input{final_refinment.tex}
+
+\begin{figure}
+    \centering
+    %\resizebox{17cm}{10cm}{
+        \input{figures/automata.tex}
+    %}
+    \caption{Automata for third refinment}
+    \label{fig:my_label}
+\end{figure}
+
+\end{document}

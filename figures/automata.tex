@@ -1,0 +1,51 @@
+\begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=2.7cm,
+                    thick, el/.style = {align=left, sloped}]
+  \tikzstyle{every state}=[]
+
+  \node[initial,initial text=init,state] (init)  {};
+  \node[state,align=center] (x_send)            [above right of=init] {};
+  \node[state,align=center] (y_send)            [below right of=init] {};
+  \node[state,align=center] (cnt)               [below right of=x_send] {};
+  \node[state,align=center] (delay_x)           [above right of=cnt] {};
+  \node[state,align=center] (delay_y)           [below right of=cnt] {};
+  \node[state,align=center] (x_send_y)          [above right of=delay_x] {};
+  \node[state,align=center] (y_send_x)          [below right of=delay_y] {};
+  \node[state,align=center] (delay_x_y)         [below right of=delay_x] {};
+  \node[state,align=center] (x_send_y_delay)    [below right of=x_send_y] {};
+  \node[state,align=center] (y_send_x_delay)    [above right of=y_send_x] {};
+  \node[state,align=center] (y_ack)             [right of=x_send_y_delay]{};
+  \node[state,align=center] (x_ack)             [right of=y_send_x_delay]{};
+  \node[state,align=center] (y_leader)          [right of=y_ack]{};
+  \node[state,align=center] (x_leader)          [right of=x_ack]{};
+  
+  \coordinate[shift={(-0.5cm,1cm)}] (interm1) at (x_send_y.north);
+  \coordinate[shift={(-0.5cm,-1cm)}] (interm2) at (y_send_x.south);
+  \coordinate[shift={(0cm, 2cm)}] (interm3) at (x_send_y.north);
+  \coordinate[shift={(0cm, -2cm)}] (interm4) at (y_send_x.south);
+  
+  \path (init)      edge node[el,above] {send\\\_msg(x,y)}      (x_send)
+                    edge node[el,below] {send\\\_msg(y,x)}      (y_send)
+        (x_send)    edge node[el,below] {send\\\_msg(y,x)}      (cnt)
+        (y_send)    edge node[el,above] {send\\\_msg(x,y)}      (cnt)
+        (cnt)       edge node[el,above] {discover\\\_cnt(x,y)}  (delay_x)
+                    edge node[el,below] {discover\\\_cnt(y,x)}  (delay_y)
+        (delay_x)   edge node[el,above] {send\\\_msg(x,y)}      (x_send_y)
+                    edge node[el,below] {discover\\\_cnt(y,x)}  (delay_x_y)
+        (delay_y)   edge node[el,below] {send\\\_msg(y,x)}      (y_send_x)
+                    edge node[el,above] {discover\\\_cnt(x,y)}  (delay_x_y)
+        (delay_x_y) edge node[el,above] {send\\\_msg(x,y)}      (x_send_y_delay)
+                    edge node[el,below] {send\\\_msg(y,x)}      (y_send_x_delay)
+        (x_send_y)  edge node[el,below] {discover\\\_cnt(y,x)}  (x_send_y_delay)
+        (y_send_x)  edge node[el,above] {discover\\\_cnt(x,y)}  (y_send_x_delay)
+        (y_send_x_delay) edge node[el,above] {send\\\_ack(x,y)} (x_ack)
+        (x_send_y_delay) edge node[el,above] {send\\\_ack(y,x)} (y_ack)
+        (y_ack)     edge node[el,above] {elect(y)}                  (y_leader)
+        (x_ack)     edge node[el,above] {elect(x)}                  (x_leader)
+        ;
+        
+    \draw[rounded corners=10pt] (y_send_x_delay) to[bend left] (interm2) to[bend left=40] node[el,below] {send\_msg\_(x,y)} (cnt);
+    \draw[rounded corners=10pt] (x_send_y_delay) to[bend right] (interm1) to[bend right=40] node[el,above] {send\_msg\_(y,x)} (cnt);
+    \draw[rounded corners=10pt] (x_send) to[bend left] (interm3) to[bend left] node[el,above] {send\_ack\_(y,x)} (y_ack);
+    \draw[rounded corners=10pt] (y_send) to[bend right] node[el,below] {send\_ack\_(x,y)} (interm4) to[bend right] (x_ack);
+    
+\end{tikzpicture}
