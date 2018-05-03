@@ -1,0 +1,173 @@
+\documentclass[10pt,a4paper]{report}
+\usepackage{bsymb,b2latex}
+\begin{document}
+\SingleHeader{M0000010}
+\MACHINE{M0000010}{M000001}{C0,C1}{}
+\VARIABLES{
+	\Variable{rt}{}
+	\Variable{bm}{}
+	\Variable{delay}{}
+	\Variable{req\_rcv}{}
+	\Variable{parent}{}
+	\Variable{children}{}
+	\Variable{nb}{}
+	\Variable{done}{}
+	\Variable{root}{}
+	\Variable{chan}{}
+	\Variable{new\_id}{}
+}
+\INVARIANTS{
+	\Invariant{inv1}{true}{$bm \subseteq{} ND$}{}
+	\Invariant{inv2}{true}{$delay \subseteq{} ND$}{}
+	\Invariant{inv3}{true}{$req\_rcv \in{} ND \tfun{} (ND \pfun{} 0\upto{}2)$}{}
+	\Invariant{inv4}{true}{$parent \in{} ND \pfun{} ND$}{}
+	\Invariant{inv5}{true}{$children \in{} ND \tfun{} \pow{}(ND)$}{}
+	\Invariant{inv6}{true}{$nb \in{} ND \tfun{} \pown{}(ND)$}{}
+	\Invariant{inv7}{true}{$done \subseteq{} ND$}{}
+	\Invariant{inv8}{true}{$root \subseteq{} ND$}{}
+}
+\EVENTS{
+\INITIALISATION{false}{}{
+	\ACTIONS{false}{
+		\Action{act1}{$rt \bcmin{} ND$}{true}{}
+		\Action{act2}{$bm \bcmeq{} \emptyset{}$}{true}{}
+		\Action{act3}{$delay \bcmeq{} \emptyset{}$}{true}{}
+		\Action{act4}{$req\_rcv \bcmeq{} \lambda{}x\qdot{}x\in{}ND|(\lambda{}y\qdot{}y\in{}gr[\{x\}]|0)$}{true}{}
+		\Action{act5}{$parent \bcmeq{} \emptyset{}$}{true}{}
+		\Action{act6}{$children \bcmeq{} \{x\mapsto{}\emptyset{}|x\in{}ND\}$}{true}{}
+		\Action{act7}{$nb \bcmeq{} \lambda{}x\qdot{}x\in{}ND|gr[\{x\}]$}{true}{}
+		\Action{act8}{$done \bcmeq{} \emptyset{}$}{true}{}
+		\Action{act9}{$root \bcmeq{} \emptyset{}$}{true}{}
+		\Action{act10}{$chan \bcmeq{} \emptyset{}$}{true}{}
+		\Action{act11}{$new\_id \bcmeq{} 0$}{true}{}
+	}
+}
+\EVT{send\_msg}{false}{ordinary}{send\_msg}{}{
+	\ANY{
+		\Param{x}{true}{}
+		\Param{y}{true}{}
+	}
+	\GUARDS{true}{
+		\Guard{grd1}{false}{$y\in{}nb(x)$}{true}{}
+		\Guard{grd2}{false}{$nb(x) = children(x) \bunion{} \{y\}$}{true}{}
+		\Guard{grd3}{false}{$y \notin{} children(x)$}{true}{}
+		\Guard{grd4}{false}{$x \notin{} bm$}{true}{}
+		\Guard{grd5}{false}{$x \notin{} delay$}{true}{}
+		\Guard{grd6}{false}{$(req\_rcv(x))(y) = 0$}{true}{}
+	}
+	\ACTIONS{true}{
+		\Action{act1}{$bm \bcmeq{} bm \bunion{} \{x\}$}{true}{}
+		\Action{act2}{$chan \bcmeq{} chan \bunion{} \{x\mapsto{}y\mapsto{}req\_type\mapsto{}new\_id\}$}{true}{}
+		\Action{act3}{$new\_id \bcmeq{} new\_id + 1$}{true}{}
+	}
+}
+\EVT{rcv\_req}{false}{ordinary}{rcv\_req}{}{
+	\ANY{
+		\Param{y}{true}{}
+		\Param{x}{true}{}
+		\Param{i}{true}{}
+	}
+	\GUARDS{true}{
+		\Guard{grd1}{false}{$x \in{} nb(y)$}{true}{}
+		\Guard{grd2}{false}{$i\in{}\nat{} \land{} (x\mapsto{}y\mapsto{}req\_type\mapsto{}i)\in{}chan$}{true}{}
+	}
+	\ACTIONS{true}{
+		\Action{act1}{$req\_rcv(y) \bcmeq{} req\_rcv(y) \ovl{} \{x\mapsto{}((req\_rcv(y))(x)+1)\}$}{true}{}
+		\Action{act2}{$chan \bcmeq{} chan\setminus{}\{x\mapsto{}y\mapsto{}req\_type\mapsto{}i\}$}{true}{}
+	}
+}
+\EVT{send\_ack}{false}{ordinary}{send\_ack}{}{
+	\ANY{
+		\Param{y}{true}{}
+		\Param{x}{true}{}
+	}
+	\GUARDS{true}{
+		\Guard{grd1}{false}{$x\in{}nb(y)$}{true}{}
+		\Guard{grd2}{false}{$x \notin{} children(y)$}{true}{}
+		\Guard{grd3}{false}{$y \notin{} bm$}{true}{}
+		\Guard{grd4}{false}{$(req\_rcv(y))(x) = 1$}{true}{}
+		\Guard{grd5}{false}{$y \notin{} delay$}{true}{}
+	}
+	\ACTIONS{true}{
+		\Action{act1}{$children(y) \bcmeq{} children(y) \bunion{} \{x\}$}{true}{}
+		\Action{act2}{$chan \bcmeq{} chan \bunion{} \{y\mapsto{}x\mapsto{}ack\_type\mapsto{}new\_id\}$}{true}{}
+		\Action{act3}{$new\_id \bcmeq{} new\_id + 1$}{true}{}
+	}
+}
+\EVT{rcv\_ack}{false}{ordinary}{rcv\_ack}{}{
+	\ANY{
+		\Param{x}{true}{}
+		\Param{y}{true}{}
+		\Param{i}{true}{}
+	}
+	\GUARDS{true}{
+		\Guard{grd1}{false}{$(y\mapsto{}x\mapsto{}ack\_type\mapsto{}i)\in{}chan$}{true}{}
+		\Guard{grd2}{false}{$x \notin{} dom(parent)$}{true}{}
+	}
+	\ACTIONS{true}{
+		\Action{act1}{$parent(x) \bcmeq{} y$}{true}{}
+		\Action{act2}{$done \bcmeq{} done \bunion{} \{x\}$}{true}{}
+		\Action{act3}{$chan \bcmeq{} chan\setminus{}\{y\mapsto{}x\mapsto{}ack\_type\mapsto{}i\}$}{true}{}
+	}
+}
+\EVT{root\_contention1}{false}{ordinary}{root\_contention1}{}{
+	\ANY{
+		\Param{y}{true}{}
+		\Param{x}{true}{}
+	}
+	\GUARDS{true}{
+		\Guard{grd1}{false}{$x \in{} nb(y)$}{true}{}
+		\Guard{grd2}{false}{$x \notin{} children(y)$}{true}{}
+		\Guard{grd3}{false}{$y \in{} bm$}{true}{}
+		\Guard{grd4}{false}{$(req\_rcv(y))(x)=1$}{true}{}
+	}
+	\ACTIONS{true}{
+		\Action{act1}{$req\_rcv(y) \bcmeq{} req\_rcv(y) \ovl{} \{x\mapsto{}((req\_rcv(y))(x)-1)\}$}{true}{}
+		\Action{act2}{$delay \bcmeq{} delay \bunion{} \{y\}$}{true}{}
+		\Action{act3}{$bm \bcmeq{} bm\setminus{}\{y\}$}{true}{}
+	}
+}
+\EVT{root\_contention2}{false}{ordinary}{root\_contention2}{}{
+	\ANY{
+		\Param{y}{true}{}
+		\Param{x}{true}{}
+	}
+	\GUARDS{true}{
+		\Guard{grd1}{false}{$x\in{}nb(y)$}{true}{}
+		\Guard{grd2}{false}{$x \notin{} children(y)$}{true}{}
+		\Guard{grd3}{false}{$y \in{} bm$}{true}{}
+		\Guard{grd4}{false}{$(req\_rcv(y))(x)=2$}{true}{}
+	}
+	\ACTIONS{true}{
+		\Action{act1}{$req\_rcv(y) \bcmeq{} req\_rcv(y) \ovl{} \{x\mapsto{}((req\_rcv(y))(x)-1)\}$}{true}{}
+		\Action{act2}{$bm \bcmeq{} bm\setminus{}\{y\}$}{true}{}
+	}
+}
+\EVT{awake}{true}{ordinary}{awake}{}{
+	\ANY{
+		\Param{x}{false}{}
+	}
+	\GUARDS{true}{
+		\Guard{grd1}{false}{$x \in{} delay$}{false}{}
+	}
+	\ACTIONS{true}{
+		\Action{act1}{$delay \bcmeq{} delay\setminus{}\{x\}$}{false}{}
+	}
+}
+\EVT{elect}{false}{ordinary}{elect}{}{
+	\ANY{
+		\Param{x}{true}{}
+	}
+	\GUARDS{true}{
+		\Guard{grd1}{false}{$x \in{} ND$}{true}{}
+		\Guard{grd2}{false}{$nb(x) = children(x)$}{true}{}
+	}
+	\ACTIONS{true}{
+		\Action{act1}{$rt \bcmeq{} x$}{true}{}
+		\Action{act2}{$done \bcmeq{} done \bunion{} \{x\}$}{true}{}
+		\Action{act3}{$root \bcmeq{} root \bunion{} \{x\}$}{true}{}
+	}
+}
+}
+\END
+\end{document}

@@ -1,29 +1,47 @@
 \section{Translation to \textit{DistAlgo}}
 
-The \textit{DistAlgo} program have the following structure.\\
-A main method in which the process are created is declared. This is where the variables that depend on the context are initialised. Other variables that are local to a node are initialised calling the \textit{setup} method of the process class for each node.
-A process class
+This section describes a manual translation from an event-b model developed on Rodin framework to a DistAlgo program.
+Said program have the following structure.
 
+% comments : what is a local variable ?
+There is first a main method in which the process are created. This is where the local variables that depend on the context are initialised. Other variables that are local to a node are initialised calling the \textit{setup} method of the process class for each node.
+This main method also run the nodes on the local machine.
+It looks like this :
+\begin{verbatim}
+def main():
+    num_proc = 11
+    nb = {0:{1,10,9}, 1:{0,2,4}, 2:{1,5,8,3}, 3:{2}, 4:{1}, 5:{2,6,7}, 6:{5},
+          7:{5}, 8:{2}, 9:{0}, 10:{0}}
+    nd = list(new(Node, num=num_proc))
+    for i,p in enumerate(nd):
+        print("Setting up process : ", p)
+        setup({p},({nd[j] for j in nb[i]},))
+    start(nd)
+\end{verbatim}
 
-
+Following the model, $nd$ ($ND$ in the model) is the set of nodes in the network.
+The variable $nb$ is a dictionary representing the function $nb$ of the model (which was only a localised version of constant $gr$), $nb$ is thus the topology graph of the network. In fact it is a projection on $\llbracket0\upto card(ND)-1\rrbracket \tfun \pow(\llbracket0\upto card(ND)-1\rrbracket)$ of the initial $nb$ function defined on $ND \tfun \pow(ND)$
+ 
+\bigskip
 \fbox{
-\begin{minipage}[c]{.4\linewidth}
+\begin{minipage}[c]{.5\linewidth}
 \MYINITIALISATION{false}{}{
 	\MYACTIONS{false}{
-		\MyAction{act1}{$ack \bcmeq{} \emptyset{}$}{true}{}
+		\MyAction{act1}{$rt \bcmin{} ND$}{true}{}
 		\MyAction{act2}{$bm \bcmeq{} \emptyset{}$}{true}{}
 		\MyAction{act3}{$delay \bcmeq{} \emptyset{}$}{true}{}
-		\MyAction{act4}{$rcv \bcmeq{} \{x\mapsto{}0|x\in{}gr\}$}{true}{}
-		\MyAction{act5}{$snt \bcmeq{} \{x\mapsto{}0|x\in{}gr\}$}{true}{}
-		\MyAction{act6}{$parent \bcmeq{} \emptyset{}$}{true}{}
-		\MyAction{act7}{$children \bcmeq{} \{x\mapsto{}\emptyset{}|x\in{}ND\}$}{true}{}
-		\MyAction{act8}{$nb \bcmeq{} \lambda{}x\qdot{}x\in{}ND|gr[\{x\}]$}{true}{}
-		\MyAction{act9}{$done \bcmeq{} \emptyset{}$}{true}{}
-		\MyAction{act10}{$root \bcmeq{} \emptyset{}$}{true}{}
+		\MyAction{act4}{$req\_rcv \bcmeq{} \lambda{}x\qdot{}x\in{}ND|(\lambda{}y\qdot{}y\in{}gr[\{x\}]|0)$}{true}{}
+		\MyAction{act5}{$parent \bcmeq{} \emptyset{}$}{true}{}
+		\MyAction{act6}{$children \bcmeq{} \{x\mapsto{}\emptyset{}|x\in{}ND\}$}{true}{}
+		\MyAction{act7}{$nb \bcmeq{} \lambda{}x\qdot{}x\in{}ND|gr[\{x\}]$}{true}{}
+		\MyAction{act8}{$done \bcmeq{} \emptyset{}$}{true}{}
+		\MyAction{act9}{$root \bcmeq{} \emptyset{}$}{true}{}
+		\MyAction{act10}{$chan \bcmeq{} \emptyset{}$}{true}{}
+		\MyAction{act11}{$new\_id \bcmeq{} 0$}{true}{}
 	}
 }
 \end{minipage}}\hfill
-\begin{minipage}[c]{.45\linewidth}
+\begin{minipage}[c]{.4\linewidth}
 \begin{verbatim}
 def setup(nb:frozenset):
     self.bm = False
@@ -38,7 +56,16 @@ def setup(nb:frozenset):
 \bigskip
 
 Initialisation of the variables is made in the setup method.
-This phase also declares the local variables that are not contextual in the sense that they are not initialised by the context.
+This method declares the local variables that are not contextual in the sense that they are not initialised by the context. Context defined variables are passed as arguments (i.e. $nb$ here which is a localised version of context constant $gr$).
+
+Subsets of $ND$ are declared as booleans. Therefore $bm \bcmeq{} \emptyset{}$ means that boolean $bm$ is initialised to $False$ for every process.
+
+Functions on $ND$ are translated as local variables. For instance, $children$ is a function which initially assign each node to the empty set. Therefore, the local variable $self.children$ in the DistAlgo program will simply be declared as a $set$ and initialised to the empty set.
+
+The particular case of $req\_rcv$ is interesting. It is a function on $ND$ and is thus translated as a local variable. The local variable is itself a function which gives the number of messages received from each neighbour. We translate this function into a dictionary. Therefore, $$req\_rcv \bcmeq{} \lambda{}x\qdot{}x\in{}ND|(\lambda{}y\qdot{}y\in{}gr[\{x\}]|0)$$ is translated into
+\begin{verbatim}
+self.rcv = {key:0 for key in nb}
+\end{verbatim}
 
 \bigskip
 \fbox{
@@ -50,15 +77,16 @@ This phase also declares the local variables that are not contextual in the sens
 	}
 	\MYGUARDS{true}{
 		\MyGuard{grd1}{false}{$y\in{}nb(x)$}{true}{}
-		\MyGuard{grd4}{false}{$nb(x) = children(x) \bunion{} \{y\}$}{true}{}
-		\MyGuard{grd5}{false}{$y \notin{} children(x)$}{true}{}
-		\MyGuard{grd6}{false}{$x \notin{} bm$}{true}{}
-		\MyGuard{grd7}{false}{$x \notin{} delay$}{true}{}
-		\MyGuard{grd8}{false}{$rcv(y\mapsto{}x)=0$}{true}{}
+		\MyGuard{grd2}{false}{$nb(x) = children(x) \bunion{} \{y\}$}{true}{}
+		\MyGuard{grd3}{false}{$y \notin{} children(x)$}{true}{}
+		\MyGuard{grd4}{false}{$x \notin{} bm$}{true}{}
+		\MyGuard{grd5}{false}{$x \notin{} delay$}{true}{}
+		\MyGuard{grd6}{false}{$rcv(y\mapsto{}x)=0$}{true}{}
 	}
 	\MYACTIONS{true}{
-		\MyAction{act1}{$snt(x\mapsto{}y) \bcmeq{} snt(x\mapsto{}y)+1$}{true}{}
-		\MyAction{act2}{$bm \bcmeq{} bm \bunion{} \{x\}$}{true}{}
+		\MyAction{act1}{$bm \bcmeq{} bm \bunion{} \{x\}$}{true}{}
+		\MyAction{act2}{$chan \bcmeq{} chan \bunion{}$\\$ \{x\mapsto{}y\mapsto{}req\_type\mapsto{}new\_id\}$}{true}{}
+		\MyAction{act3}{$new\_id \bcmeq{} new\_id + 1$}{true}{}
 	}
 }
 \end{minipage}}\hfill
@@ -74,7 +102,6 @@ def run():
                       and rcv[y]==0)):
             send(('req'), to=y)
             bm = True
-            print(self, " sends a req to ", y)
 \end{verbatim}
 \end{minipage}
 \bigskip
@@ -82,35 +109,27 @@ def run():
 
 \fbox{
 \begin{minipage}[c]{.4\linewidth}
-\EVENT{rcv\_msg}{true}{ordinary}{}{}{
+\EVENT{rcv\_req}{true}{ordinary}{}{}{
 	\MYANY{
-		\MyParam{x}{true}{}
 		\MyParam{y}{true}{}
+		\MyParam{x}{true}{}
+		\MyParam{i}{true}{}
 	}
 	\MYGUARDS{true}{
-		\MyGuard{grd1}{false}{$y\in{}nb(x)$}{true}{}
-		\MyGuard{grd4}{false}{$nb(x) = children(x) \bunion{} \{y\}$}{true}{}
-		\MyGuard{grd5}{false}{$y \notin{} children(x)$}{true}{}
-		\MyGuard{grd6}{false}{$x \notin{} bm$}{true}{}
-		\MyGuard{grd7}{false}{$x \notin{} delay$}{true}{}
-		\MyGuard{grd8}{false}{$rcv(y\mapsto{}x)=0$}{true}{}
+		\MyGuard{grd1}{false}{$x \in{} nb(y)$}{true}{}
+		\MyGuard{grd2}{false}{$i\in{}\nat{} \land{} (x\mapsto{}y\mapsto{}req\_type\mapsto{}i)\in{}chan$}{true}{}
 	}
 	\MYACTIONS{true}{
-		\MyAction{act1}{$snt(x\mapsto{}y) \bcmeq{} snt(x\mapsto{}y)+1$}{true}{}
-		\MyAction{act2}{$bm \bcmeq{} bm \bunion{} \{x\}$}{true}{}
+		\MyAction{act1}{$req\_rcv(y) \bcmeq{} req\_rcv(y) \ovl{} \{x\mapsto{}((req\_rcv(y))(x)+1)\}$}{true}{}
+		\MyAction{act2}{$chan \bcmeq{} chan\setminus{}\{x\mapsto{}y\mapsto{}req\_type\mapsto{}i\}$}{true}{}
 	}
 }
 \end{minipage}}\hfill
 \begin{minipage}[c]{.45\linewidth}
 \begin{verbatim}
-        elif some(x in nb,
-                  has=x not in children
-                  and not bm
-                  and rcv[x]==1
-                  and delay==None):
-            send(('ack'), to=x)
-            children = children|{x}
-            print(self, " sends an ack to ", x)
+def receive(msg=('req'), from_=x):
+    print(self, " just received a request from ",x)
+    rcv[x] += 1
 \end{verbatim}
 \end{minipage}
 \bigskip
@@ -127,22 +146,25 @@ def run():
 		\MyGuard{grd1}{false}{$x\in{}nb(y)$}{true}{}
 		\MyGuard{grd2}{false}{$x \notin{} children(y)$}{true}{}
 		\MyGuard{grd3}{false}{$y \notin{} bm$}{true}{}
-		\MyGuard{grd4}{false}{$rcv(x\mapsto{}y)=1$}{true}{}
+		\MyGuard{grd4}{false}{$(req\_rcv(y))(x) = 1$}{true}{}
 		\MyGuard{grd5}{false}{$y \notin{} delay$}{true}{}
 	}
 	\MYACTIONS{true}{
-		\MyAction{act1}{$ack \bcmeq{} ack \bunion{} \{x\mapsto{}y\}$}{true}{}
-		\MyAction{act2}{$children(y) \bcmeq{} children(y) \bunion{} \{x\}$}{true}{}
+		\MyAction{act1}{$children(y) \bcmeq{} children(y) \bunion{} \{x\}$}{true}{}
+		\MyAction{act2}{$chan \bcmeq{} chan \bunion{} \{y\mapsto{}x\mapsto{}ack\_type\mapsto{}new\_id\}$}{true}{}
+		\MyAction{act3}{$new\_id \bcmeq{} new\_id + 1$}{true}{}
 	}
 }
 \end{minipage}}\hfill
 \begin{minipage}[c]{.45\linewidth}
 \begin{verbatim}
-elif some(y in nb,
-          has=y in ack
-          and parent==None):
-    parent = y
-    break
+        elif some(x in nb,
+                  has=x not in children
+                  and not bm
+                  and rcv[x]==1
+                  and delay==None):
+            send(('ack'), to=x)
+            children = children|{x}
 \end{verbatim}
 \end{minipage}
 \bigskip
@@ -154,34 +176,33 @@ elif some(y in nb,
 	\MYANY{
 		\MyParam{x}{true}{}
 		\MyParam{y}{true}{}
+		\MyParam{i}{true}{}
 	}
 	\MYGUARDS{true}{
-		\MyGuard{grd1}{false}{$x\mapsto{}y\in{}ack$}{true}{}
+		\MyGuard{grd1}{false}{$(y\mapsto{}x\mapsto{}ack\_type\mapsto{}i)\in{}chan$}{true}{}
 		\MyGuard{grd2}{false}{$x \notin{} dom(parent)$}{true}{}
 	}
 	\MYACTIONS{true}{
 		\MyAction{act1}{$parent(x) \bcmeq{} y$}{true}{}
 		\MyAction{act2}{$done \bcmeq{} done \bunion{} \{x\}$}{true}{}
+		\MyAction{act3}{$chan \bcmeq{} chan\setminus{}\{y\mapsto{}x\mapsto{}ack\_type\mapsto{}i\}$}{true}{}
 	}
 }
 \end{minipage}}\hfill
 \begin{minipage}[c]{.45\linewidth}
 \begin{verbatim}
-elif some(x in nb,
-          has=x not in children
-          and bm
-          and rcv[x] == 2):
-    print(self, " entered root_contention with ", x)
-    rcv[x] = rcv[x] - 1
-    delay = chose_delay()
-    bm = False
-    time.sleep(delay)
-    delay = None
+        elif some(y in nb,
+                  has=y in ack
+                  and parent==None):
+            parent = y
+            break
 \end{verbatim}
 \end{minipage}
 \bigskip
 
+The done variable is a termination variable and thus $done \bcmeq{} done \bunion{} \{x\}$ is translated to the statement \textit{break}.
 
+\bigskip
 \fbox{
 \begin{minipage}[c]{.4\linewidth}
 \EVENT{root\_contention1}{false}{ordinary}{}{}{
@@ -193,10 +214,10 @@ elif some(x in nb,
 		\MyGuard{grd1}{false}{$x \in{} nb(y)$}{true}{}
 		\MyGuard{grd2}{false}{$x \notin{} children(y)$}{true}{}
 		\MyGuard{grd3}{false}{$y \in{} bm$}{true}{}
-		\MyGuard{grd4}{false}{$rcv(x\mapsto{}y)=1$}{true}{}
+		\MyGuard{grd4}{false}{$(req\_rcv(y))(x)=1$}{true}{}
 	}
 	\MYACTIONS{true}{
-		\MyAction{act1}{$rcv(x\mapsto{}y)\bcmeq{} rcv(x\mapsto{}y)-1$}{true}{}
+		\MyAction{act1}{$req\_rcv(y) \bcmeq{} req\_rcv(y) \ovl{} \{x\mapsto{}((req\_rcv(y))(x)-1)\}$}{true}{}
 		\MyAction{act2}{$delay \bcmeq{} delay \bunion{} \{y\}$}{true}{}
 		\MyAction{act3}{$bm \bcmeq{} bm\setminus{}\{y\}$}{true}{}
 	}
@@ -204,16 +225,15 @@ elif some(x in nb,
 \end{minipage}}\hfill
 \begin{minipage}[c]{.45\linewidth}
 \begin{verbatim}
-elif some(x in nb,
-          has=x not in children
-          and bm
-          and rcv[x] == 1):
-    print(self, " entered root_contention with ", x)
-    rcv[x] = rcv[x] - 1
-    delay = chose_delay()
-    bm = False
-    time.sleep(delay)
-    delay = None
+        elif some(x in nb,
+                  has=x not in children
+                  and bm
+                  and rcv[x] == 1):
+            rcv[x] = rcv[x] - 1
+            delay = chose_delay()
+            bm = False
+            time.sleep(delay)
+            delay = None
 \end{verbatim}
 \end{minipage}
 \bigskip
@@ -230,23 +250,22 @@ elif some(x in nb,
 		\MyGuard{grd1}{false}{$x\in{}nb(y)$}{true}{}
 		\MyGuard{grd2}{false}{$x \notin{} children(y)$}{true}{}
 		\MyGuard{grd3}{false}{$y \in{} bm$}{true}{}
-		\MyGuard{grd4}{false}{$rcv(x\mapsto{}y)=2$}{true}{}
+		\MyGuard{grd4}{false}{$(req\_rcv(y))(x)=2$}{true}{}
 	}
 	\MYACTIONS{true}{
-		\MyAction{act1}{$rcv(x\mapsto{}y)\bcmeq{} rcv(x\mapsto{}y)-1$}{true}{}
+		\MyAction{act1}{$req\_rcv(y) \bcmeq{} req\_rcv(y) \ovl{} \{x\mapsto{}((req\_rcv(y))(x)-1)\}$}{true}{}
 		\MyAction{act2}{$bm \bcmeq{} bm\setminus{}\{y\}$}{true}{}
 	}
 }
 \end{minipage}}\hfill
 \begin{minipage}[c]{.45\linewidth}
 \begin{verbatim}
-elif some(x in nb,
-          has=x not in children
-          and bm
-          and rcv[x] == 2):
-    print(self, " entered root contention with ", x)
-    rcv[x] = rcv[x] - 1
-    bm = False
+        elif some(x in nb,
+                  has=x not in children
+                  and bm
+                  and rcv[x] == 2):
+            rcv[x] = rcv[x] - 1
+            bm = False
 \end{verbatim}
 \end{minipage}
 \bigskip
@@ -272,8 +291,8 @@ elif some(x in nb,
 \end{minipage}}\hfill
 \begin{minipage}[c]{.45\linewidth}
 \begin{verbatim}
-elif nb==children:
-    root = True
-    break
+        elif nb==children:
+            root = True
+            done = True
 \end{verbatim}
 \end{minipage}
